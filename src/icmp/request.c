@@ -60,26 +60,31 @@ static uint8_t *build_echo_request(const t_ping_context *ctx,
 }
 
 /**
- * @brief Sends one ICMP Echo Request to the destination.
+ * @brief Sends an ICMP Echo Request and records its timestamp.
  *
- * Builds an ICMP packet, records its send timestamp,
- * and transmits it through the raw socket.
+ * Builds the packet, records the send time, and transmits
+ * it through the raw socket.
  *
- * @param ctx Application context containing the destination,
- * socket descriptor, and packet identifiers.
- * @return 0 on successful transmission, -1 on failure.
+ * After successful transmission, updates the request
+ * tracking table and advances the sequence number.
+ *
+ * @param ctx Application context containing socket,
+ * destination, and request tracking information.
+ * @return 0 on successful transmission, -1 on error.
  */
 int send_icmp_request(t_ping_context *ctx)
 {
     uint8_t *packet;
     size_t packet_size;
+    struct timespec sent_at;
     ssize_t sent;
+    t_ping_request *request;
 
     packet = build_echo_request(ctx, &packet_size);
     if (packet == NULL)
         return -1;
 
-    if (get_monotonic_time(&ctx->sent_at) != 0)
+    if (get_monotonic_time(&sent_at) != 0)
     {
         free(packet);
         return -1;
@@ -102,6 +107,15 @@ int send_icmp_request(t_ping_context *ctx)
         fprintf(stderr, "ft_ping: incomplete ICMP send\n");
         return -1;
     }
+
+    request = &ctx->requests[ctx->sequence];
+
+    request->sent_at = sent_at;
+    request->sent = 1;
+    request->received = 0;
+
+    ctx->transmitted++;
+    ctx->sequence++;
 
     return 0;
 }

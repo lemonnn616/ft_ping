@@ -14,7 +14,9 @@ SRC = src/main.c \
       src/icmp/checksum.c \
       src/icmp/request.c \
       src/icmp/reply.c \
-      src/runtime/timing.c
+      src/runtime/timing.c \
+      src/runtime/signals.c \
+      src/runtime/ping_loop.c
 
 OBJ = $(SRC:src/%.c=build/%.o)
 

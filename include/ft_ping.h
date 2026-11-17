@@ -9,6 +9,7 @@
 
 #define PING_DEFAULT_PAYLOAD_SIZE 56
 #define PING_MAX_PAYLOAD_SIZE 65507
+#define PING_SEQUENCE_COUNT 65536U
 
 /**
  * @brief Stores the command-line configuration for ft_ping.
@@ -36,10 +37,23 @@ typedef struct s_ping_target
 } t_ping_target;
 
 /**
+ * @brief Tracks one ICMP Echo Request.
+ *
+ * Stores its transmission timestamp and whether
+ * a matching Echo Reply has already been received.
+ */
+typedef struct s_ping_request
+{
+    struct timespec sent_at;
+    int sent;
+    int received;
+} t_ping_request;
+
+/**
  * @brief Stores the complete runtime state of ft_ping.
  *
- * Contains application configuration, destination,
- * ICMP socket, packet identifiers, and send timestamp.
+ * Contains configuration, socket information, ICMP
+ * identifiers, request tracking, and packet counters.
  */
 typedef struct s_ping_context
 {
@@ -48,7 +62,9 @@ typedef struct s_ping_context
     int socket_fd;
     uint16_t identifier;
     uint16_t sequence;
-    struct timespec sent_at;
+    t_ping_request *requests;
+    uint64_t transmitted;
+    uint64_t received;
 } t_ping_context;
 
 /**
@@ -84,10 +100,13 @@ int resolve_target(const char *hostname, t_ping_target *target);
 int create_icmp_socket(void);
 uint16_t icmp_checksum(const void *data, size_t length);
 int send_icmp_request(t_ping_context *ctx);
-int receive_icmp_reply(const t_ping_context *ctx, int timeout_ms);
+int receive_icmp_reply(t_ping_context *ctx);
 int get_monotonic_time(struct timespec *result);
 int64_t monotonic_milliseconds(void);
 double elapsed_milliseconds(const struct timespec *start,
                             const struct timespec *end);
+int install_signal_handlers(void);
+int stop_requested(void);
+int run_ping_loop(t_ping_context *ctx);
 
 #endif

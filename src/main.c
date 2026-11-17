@@ -1,27 +1,31 @@
 #include "ft_ping.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <inttypes.h>
 #include <unistd.h>
 
 /**
  * @brief Entry point of the ft_ping application.
  *
- * Parses arguments, resolves the destination, creates
- * an ICMP raw socket, sends one Echo Request, and waits
- * for a matching Echo Reply.
+ * Initializes options, resolves the destination, opens
+ * the ICMP socket, allocates request tracking memory,
+ * installs signal handlers, and runs the ping loop.
+ *
+ * Releases all resources before exiting.
  *
  * @param argc Number of command-line arguments.
  * @param argv Array of command-line argument strings.
  *
- * @return 0 when help is requested or a reply is received.
- * @return 1 on initialization, transmission, or receive failure.
- * @return 2 when command-line arguments are invalid.
+ * @return 0 after normal termination or help output.
+ * @return 1 on initialization or runtime error.
+ * @return 2 for invalid command-line arguments.
  */
 int main(int argc, char **argv)
 {
     t_ping_context ctx = {0};
     t_parse_result result;
-    int receive_status;
+    int status;
 
     ctx.socket_fd = -1;
 
@@ -43,34 +47,44 @@ int main(int argc, char **argv)
     if (ctx.socket_fd == -1)
         return 1;
 
-    ctx.identifier = (uint16_t)getpid();
-    ctx.sequence = 1;
+    ctx.requests = calloc(PING_SEQUENCE_COUNT,
+                          sizeof(*ctx.requests));
 
-    if (send_icmp_request(&ctx) != 0)
+    if (ctx.requests == NULL)
     {
+        perror("ft_ping: calloc");
         close(ctx.socket_fd);
         return 1;
     }
 
-    printf("Sent ICMP Echo Request to %s\n",
-           ctx.target.ip_string);
+    ctx.identifier = (uint16_t)getpid();
+    ctx.sequence = 1;
 
-    receive_status = receive_icmp_reply(&ctx, 2000);
+    if (install_signal_handlers() != 0)
+    {
+        free(ctx.requests);
+        close(ctx.socket_fd);
+        return 1;
+    }
+
+    printf("PING %s (%s): %zu data bytes\n",
+           ctx.options.target,
+           ctx.target.ip_string,
+           ctx.options.payload_size);
+
+    status = run_ping_loop(&ctx);
+
+    printf("\nStopped: %" PRIu64
+           " transmitted, %" PRIu64 " received\n",
+           ctx.transmitted, ctx.received);
 
     if (close(ctx.socket_fd) == -1)
     {
         perror("ft_ping: close");
-        return 1;
+        status = -1;
     }
 
-    if (receive_status == 1)
-    {
-        fprintf(stderr, "ft_ping: echo reply timeout\n");
-        return 1;
-    }
+    free(ctx.requests);
 
-    if (receive_status < 0)
-        return 1;
-
-    return 0;
+    return status == 0 ? 0 : 1;
 }
