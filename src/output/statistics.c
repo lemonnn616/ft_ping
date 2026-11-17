@@ -63,7 +63,7 @@ void print_statistics(const t_ping_context *ctx)
             (double)stats->transmitted;
     }
 
-    printf("\n--- %s ping statistics ---\n", ctx->options.target);
+    printf("--- %s ping statistics ---\n", ctx->options.target);
 
     printf("%" PRIu64 " packets transmitted, "
            "%" PRIu64 " packets received",
