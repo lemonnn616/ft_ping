@@ -65,7 +65,7 @@ int main(int argc, char **argv)
     }
 
     ctx.identifier = (uint16_t)getpid();
-    ctx.sequence = 1;
+    ctx.sequence = 0;
 
     if (install_signal_handlers() != 0)
     {
@@ -74,10 +74,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("PING %s (%s): %zu data bytes\n",
+    printf("PING %s (%s): %zu data bytes",
            ctx.options.target,
            ctx.target.ip_string,
            ctx.options.payload_size);
+
+    if (ctx.options.verbose)
+        printf(", id 0x%04x = %u",
+               (unsigned)ctx.identifier,
+               (unsigned)ctx.identifier);
+
+    putchar('\n');
 
     status = run_ping_loop(&ctx);
 
@@ -92,7 +99,7 @@ int main(int argc, char **argv)
     free(ctx.requests);
 
     if (status != 0)
-    return 1;
+        return 1;
 
     return ctx.stats.received > 0 ? 0 : 1;
 }
