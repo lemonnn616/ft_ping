@@ -12,7 +12,8 @@ SRC = src/main.c \
       src/network/resolve.c \
       src/network/socket.c \
       src/icmp/checksum.c \
-      src/icmp/request.c
+      src/icmp/request.c \
+      src/icmp/reply.c
 
 OBJ = $(SRC:src/%.c=build/%.o)
 

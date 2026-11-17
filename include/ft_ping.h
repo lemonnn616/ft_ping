@@ -82,5 +82,6 @@ int resolve_target(const char *hostname, t_ping_target *target);
 int create_icmp_socket(void);
 uint16_t icmp_checksum(const void *data, size_t length);
 int send_icmp_request(t_ping_context *ctx);
+int receive_icmp_reply(const t_ping_context *ctx, int timeout_ms);
 
 #endif

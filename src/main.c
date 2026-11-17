@@ -6,23 +6,22 @@
 /**
  * @brief Entry point of the ft_ping application.
  *
- * Parses arguments, resolves the target, creates a raw socket,
- * and sends one ICMP Echo Request.
- *
- * Receiving ICMP replies will be implemented in the next step.
+ * Parses arguments, resolves the destination, creates
+ * an ICMP raw socket, sends one Echo Request, and waits
+ * for a matching Echo Reply.
  *
  * @param argc Number of command-line arguments.
  * @param argv Array of command-line argument strings.
  *
- * @return 0 if help was requested.
- * @return 1 on initialization or transmission failure,
- * or when reaching the unimplemented reply-handling stage.
- * @return 2 if command-line arguments are invalid.
+ * @return 0 when help is requested or a reply is received.
+ * @return 1 on initialization, transmission, or receive failure.
+ * @return 2 when command-line arguments are invalid.
  */
 int main(int argc, char **argv)
 {
     t_ping_context ctx = {0};
     t_parse_result result;
+    int receive_status;
 
     ctx.socket_fd = -1;
 
@@ -56,8 +55,7 @@ int main(int argc, char **argv)
     printf("Sent ICMP Echo Request to %s\n",
            ctx.target.ip_string);
 
-    printf("Identifier: %u, Sequence: %u\n",
-           ctx.identifier, ctx.sequence);
+    receive_status = receive_icmp_reply(&ctx, 2000);
 
     if (close(ctx.socket_fd) == -1)
     {
@@ -65,7 +63,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    fprintf(stderr, "ft_ping: reply handling not implemented yet\n");
+    if (receive_status == 1)
+    {
+        fprintf(stderr, "ft_ping: echo reply timeout\n");
+        return 1;
+    }
 
-    return 1;
+    if (receive_status < 0)
+        return 1;
+
+    return 0;
 }
