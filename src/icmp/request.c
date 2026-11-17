@@ -60,14 +60,14 @@ static uint8_t *build_echo_request(const t_ping_context *ctx,
 }
 
 /**
- * @brief Sends one ICMP Echo Request to the IPv4 destination.
+ * @brief Sends one ICMP Echo Request to the destination.
  *
- * Builds an ICMP message and transmits it using the raw socket.
- * Linux generates the IPv4 header automatically.
+ * Builds an ICMP packet, records its send timestamp,
+ * and transmits it through the raw socket.
  *
- * @param ctx Application context containing the socket,
- * destination, identifier, sequence, and payload size.
- * @return 0 if all ICMP bytes were sent, -1 on failure.
+ * @param ctx Application context containing the destination,
+ * socket descriptor, and packet identifiers.
+ * @return 0 on successful transmission, -1 on failure.
  */
 int send_icmp_request(t_ping_context *ctx)
 {
@@ -78,6 +78,12 @@ int send_icmp_request(t_ping_context *ctx)
     packet = build_echo_request(ctx, &packet_size);
     if (packet == NULL)
         return -1;
+
+    if (get_monotonic_time(&ctx->sent_at) != 0)
+    {
+        free(packet);
+        return -1;
+    }
 
     sent = sendto(ctx->socket_fd, packet, packet_size, 0,
                   (const struct sockaddr *)&ctx->target.address,

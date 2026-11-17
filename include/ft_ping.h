@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <time.h>
 
 #define PING_DEFAULT_PAYLOAD_SIZE 56
 #define PING_MAX_PAYLOAD_SIZE 65507
@@ -37,8 +38,8 @@ typedef struct s_ping_target
 /**
  * @brief Stores the complete runtime state of ft_ping.
  *
- * Contains application settings, the resolved destination,
- * the ICMP socket, and identifiers for outgoing requests.
+ * Contains application configuration, destination,
+ * ICMP socket, packet identifiers, and send timestamp.
  */
 typedef struct s_ping_context
 {
@@ -47,6 +48,7 @@ typedef struct s_ping_context
     int socket_fd;
     uint16_t identifier;
     uint16_t sequence;
+    struct timespec sent_at;
 } t_ping_context;
 
 /**
@@ -83,5 +85,9 @@ int create_icmp_socket(void);
 uint16_t icmp_checksum(const void *data, size_t length);
 int send_icmp_request(t_ping_context *ctx);
 int receive_icmp_reply(const t_ping_context *ctx, int timeout_ms);
+int get_monotonic_time(struct timespec *result);
+int64_t monotonic_milliseconds(void);
+double elapsed_milliseconds(const struct timespec *start,
+                            const struct timespec *end);
 
 #endif

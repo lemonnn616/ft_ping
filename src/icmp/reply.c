@@ -9,23 +9,6 @@
 #include <sys/socket.h>
 #include <time.h>
 
-/**
- * @brief Returns the current monotonic time in milliseconds.
- *
- * Uses CLOCK_MONOTONIC, which is not affected by manual
- * changes to the system's wall-clock time.
- *
- * @return Monotonic time in milliseconds, or -1 on failure.
- */
-static int64_t monotonic_milliseconds(void)
-{
-    struct timespec ts;
-
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1)
-        return -1;
-
-    return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-}
 
 /**
  * @brief Checks whether a received packet is our Echo Reply.
@@ -117,13 +100,12 @@ int receive_icmp_reply(const t_ping_context *ctx, int timeout_ms)
     ssize_t count;
     size_t icmp_length;
     uint8_t ttl;
+    struct timespec received_at;
+    double rtt_ms;
 
     now = monotonic_milliseconds();
     if (now < 0)
-    {
-        perror("ft_ping: clock_gettime");
         return -1;
-    }
 
     deadline = now + timeout_ms;
 
@@ -131,10 +113,7 @@ int receive_icmp_reply(const t_ping_context *ctx, int timeout_ms)
     {
         now = monotonic_milliseconds();
         if (now < 0)
-        {
-            perror("ft_ping: clock_gettime");
             return -1;
-        }
 
         if (now >= deadline)
             return 1;
@@ -171,15 +150,21 @@ int receive_icmp_reply(const t_ping_context *ctx, int timeout_ms)
             return -1;
         }
 
+        if (get_monotonic_time(&received_at) != 0)
+            return -1;
+
         if (!is_expected_reply(packet, count, ctx,
-                               &icmp_length, &ttl))
+                            &icmp_length, &ttl))
             continue;
 
-        printf("%zu bytes from %s: icmp_seq=%u ttl=%u\n",
-               icmp_length,
-               ctx->target.ip_string,
-               (unsigned)ctx->sequence,
-               (unsigned)ttl);
+        rtt_ms = elapsed_milliseconds(&ctx->sent_at, &received_at);
+
+        printf("%zu bytes from %s: icmp_seq=%u ttl=%u time=%.3f ms\n",
+            icmp_length,
+            ctx->target.ip_string,
+            (unsigned)ctx->sequence,
+            (unsigned)ttl,
+            rtt_ms);
 
         return 0;
     }
