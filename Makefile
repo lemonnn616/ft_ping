@@ -8,7 +8,8 @@ CPPFLAGS = -Iinclude
 
 SRC = src/main.c \
       src/options/parse_options.c \
-      src/options/print_help.c
+      src/options/print_help.c \
+      src/network/resolve.c
 
 OBJ = $(SRC:src/%.c=build/%.o)
 
