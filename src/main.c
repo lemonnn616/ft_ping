@@ -74,9 +74,7 @@ int main(int argc, char **argv)
 
     status = run_ping_loop(&ctx);
 
-    printf("\nStopped: %" PRIu64
-           " transmitted, %" PRIu64 " received\n",
-           ctx.transmitted, ctx.received);
+    print_statistics(&ctx);
 
     if (close(ctx.socket_fd) == -1)
     {
@@ -86,5 +84,8 @@ int main(int argc, char **argv)
 
     free(ctx.requests);
 
-    return status == 0 ? 0 : 1;
+    if (status != 0)
+    return 1;
+
+    return ctx.stats.received > 0 ? 0 : 1;
 }

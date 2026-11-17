@@ -6,6 +6,8 @@ CFLAGS = -Wall -Wextra -Werror -g3
 
 CPPFLAGS = -Iinclude
 
+LDLIBS = -lm
+
 SRC = src/main.c \
       src/options/parse_options.c \
       src/options/print_help.c \
@@ -16,7 +18,8 @@ SRC = src/main.c \
       src/icmp/reply.c \
       src/runtime/timing.c \
       src/runtime/signals.c \
-      src/runtime/ping_loop.c
+      src/runtime/ping_loop.c \
+      src/output/statistics.c
 
 OBJ = $(SRC:src/%.c=build/%.o)
 
@@ -25,7 +28,7 @@ DEP = $(OBJ:.o=.d)
 all: $(NAME)
 
 $(NAME): $(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) -o $(NAME)
+	$(CC) $(CFLAGS) $(OBJ) -o $(NAME) $(LDLIBS)
 
 build/%.o: src/%.c
 	@mkdir -p $(dir $@)

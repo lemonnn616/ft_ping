@@ -7,6 +7,8 @@
 #include <string.h>
 #include <sys/socket.h>
 
+int is_duplicate;
+
 /**
  * @brief Stores metadata extracted from an ICMP Echo Reply.
  *
@@ -117,20 +119,32 @@ int receive_icmp_reply(t_ping_context *ctx)
 
     request = &ctx->requests[reply.sequence];
 
-    if (!request->sent || request->received)
+    if (!request->sent)
         return 0;
-
-    request->received = 1;
-    ctx->received++;
 
     rtt_ms = elapsed_milliseconds(&request->sent_at, &received_at);
 
-    printf("%zu bytes from %s: icmp_seq=%u ttl=%u time=%.3f ms\n",
-           reply.icmp_length,
-           ctx->target.ip_string,
-           (unsigned)reply.sequence,
-           (unsigned)reply.ttl,
-           rtt_ms);
+    is_duplicate = request->received;
+
+    if (is_duplicate)
+    {
+        ctx->stats.duplicates++;
+    }
+    else
+    {
+        request->received = 1;
+        ctx->stats.received++;
+    }
+
+    update_rtt_stats(&ctx->stats, rtt_ms);
+
+    printf("%zu bytes from %s: icmp_seq=%u ttl=%u time=%.3f ms%s\n",
+        reply.icmp_length,
+        ctx->target.ip_string,
+        (unsigned)reply.sequence,
+        (unsigned)reply.ttl,
+        rtt_ms,
+        is_duplicate ? " (DUP!)" : "");
 
     return 0;
 }

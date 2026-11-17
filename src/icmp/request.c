@@ -114,7 +114,7 @@ int send_icmp_request(t_ping_context *ctx)
     request->sent = 1;
     request->received = 0;
 
-    ctx->transmitted++;
+    ctx->stats.transmitted++;
     ctx->sequence++;
 
     return 0;

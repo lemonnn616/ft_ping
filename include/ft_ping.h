@@ -50,10 +50,31 @@ typedef struct s_ping_request
 } t_ping_request;
 
 /**
+ * @brief Stores packet counters and RTT statistics.
+ *
+ * Uses Welford's online algorithm to calculate
+ * the mean and population variance of RTT samples.
+ *
+ * Duplicate replies are counted separately and
+ * do not increase the unique received packet count.
+ */
+typedef struct s_ping_stats
+{
+    uint64_t transmitted;
+    uint64_t received;
+    uint64_t duplicates;
+    uint64_t rtt_samples;
+    double min_rtt;
+    double max_rtt;
+    double mean_rtt;
+    double m2_rtt;
+} t_ping_stats;
+
+/**
  * @brief Stores the complete runtime state of ft_ping.
  *
- * Contains configuration, socket information, ICMP
- * identifiers, request tracking, and packet counters.
+ * Contains application configuration, destination,
+ * ICMP socket, request tracking, and statistics.
  */
 typedef struct s_ping_context
 {
@@ -63,8 +84,7 @@ typedef struct s_ping_context
     uint16_t identifier;
     uint16_t sequence;
     t_ping_request *requests;
-    uint64_t transmitted;
-    uint64_t received;
+    t_ping_stats stats;
 } t_ping_context;
 
 /**
@@ -108,5 +128,7 @@ double elapsed_milliseconds(const struct timespec *start,
 int install_signal_handlers(void);
 int stop_requested(void);
 int run_ping_loop(t_ping_context *ctx);
+void update_rtt_stats(t_ping_stats *stats, double rtt_ms);
+void print_statistics(const t_ping_context *ctx);
 
 #endif
