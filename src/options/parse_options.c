@@ -37,10 +37,39 @@ static int is_short_help(int argc, char **argv)
 }
 
 /**
+ * @brief Parses and validates an IPv4 TTL value.
+ *
+ * Accepts only decimal integers in the range 1..255.
+ *
+ * @param value Input TTL string.
+ * @param ttl Output parameter receiving the parsed TTL.
+ * @return 0 on success, -1 for an invalid value.
+ */
+static int parse_ttl(const char *value, int *ttl)
+{
+    char *end;
+    long parsed;
+
+    if (value == NULL || *value == '\0')
+        return -1;
+
+    errno = 0;
+    parsed = strtol(value, &end, 10);
+
+    if (errno != 0 || *end != '\0' ||
+        parsed < 1 || parsed > 255)
+        return -1;
+
+    *ttl = (int)parsed;
+
+    return 0;
+}
+
+/**
  * @brief Parses command-line options and validates the target.
  *
- * Supports -v, --verbose, -?, and --help.
- * Stores the target hostname and verbose flag in options.
+ * Supports -v, --verbose, -?, --help, and --ttl.
+ * Stores the target hostname and parsed settings in options.
  *
  * @param argc Number of command-line arguments.
  * @param argv Array of command-line argument strings.
@@ -112,31 +141,3 @@ t_parse_result parse_options(
     return PARSE_OK;
 }
 
-/**
- * @brief Parses and validates an IPv4 TTL value.
- *
- * Accepts only decimal integers in the range 1..255.
- *
- * @param value Input TTL string.
- * @param ttl Output parameter receiving the parsed TTL.
- * @return 0 on success, -1 for an invalid value.
- */
-static int parse_ttl(const char *value, int *ttl)
-{
-    char *end;
-    long parsed;
-
-    if (value == NULL || *value == '\0')
-        return -1;
-
-    errno = 0;
-    parsed = strtol(value, &end, 10);
-
-    if (errno != 0 || *end != '\0' ||
-        parsed < 1 || parsed > 255)
-        return -1;
-
-    *ttl = (int)parsed;
-
-    return 0;
-}
