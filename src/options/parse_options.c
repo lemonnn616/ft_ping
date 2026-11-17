@@ -3,6 +3,11 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+
+
+#define OPT_TTL 1000
 
 /**
  * @brief Checks whether the current short option requests help.
@@ -54,12 +59,14 @@ t_parse_result parse_options(
     static const struct option long_options[] = {
         {"verbose", no_argument, NULL, 'v'},
         {"help", no_argument, NULL, 'h'},
+        {"ttl", required_argument, NULL, OPT_TTL},
         {NULL, 0, NULL, 0}
     };
 
     int opt;
 
     options->payload_size = PING_DEFAULT_PAYLOAD_SIZE;
+    options->ttl = 0;
     opterr = 0;
 
     while ((opt = getopt_long(argc, argv, "v?",
@@ -72,6 +79,15 @@ t_parse_result parse_options(
         else if (opt == '?' && optopt == 0 &&
                  is_short_help(argc, argv))
             return PARSE_HELP;
+        else if (opt == OPT_TTL)
+        {
+            if (parse_ttl(optarg, &options->ttl) != 0)
+            {
+                fprintf(stderr,
+                        "ft_ping: invalid TTL (expected 1..255)\n");
+                return PARSE_ERROR;
+            }
+        }
         else
         {
             fprintf(stderr, "ft_ping: invalid option\n");
@@ -94,4 +110,33 @@ t_parse_result parse_options(
     options->target = argv[optind];
 
     return PARSE_OK;
+}
+
+/**
+ * @brief Parses and validates an IPv4 TTL value.
+ *
+ * Accepts only decimal integers in the range 1..255.
+ *
+ * @param value Input TTL string.
+ * @param ttl Output parameter receiving the parsed TTL.
+ * @return 0 on success, -1 for an invalid value.
+ */
+static int parse_ttl(const char *value, int *ttl)
+{
+    char *end;
+    long parsed;
+
+    if (value == NULL || *value == '\0')
+        return -1;
+
+    errno = 0;
+    parsed = strtol(value, &end, 10);
+
+    if (errno != 0 || *end != '\0' ||
+        parsed < 1 || parsed > 255)
+        return -1;
+
+    *ttl = (int)parsed;
+
+    return 0;
 }

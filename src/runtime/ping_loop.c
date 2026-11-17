@@ -3,20 +3,22 @@
 #include <errno.h>
 #include <poll.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
 
 #define PING_INTERVAL_MS 1000
 
 /**
  * @brief Runs the continuous ICMP send/receive loop.
  *
- * Sends Echo Requests at one-second intervals.
- * Uses poll() to receive replies without delaying
- * the next scheduled transmission.
+ * Sends Echo Requests every second and processes incoming
+ * ICMP packets independently of the send schedule.
  *
- * Stops gracefully after SIGINT or SIGTERM.
+ * Handles recoverable socket errors without stopping
+ * the application.
  *
  * @param ctx Initialized ping application context.
- * @return 0 after graceful shutdown, -1 on error.
+ * @return 0 after graceful shutdown, -1 on fatal error.
  */
 int run_ping_loop(t_ping_context *ctx)
 {
@@ -28,6 +30,9 @@ int run_ping_loop(t_ping_context *ctx)
     int64_t next_send;
     int64_t now;
     int ready;
+    int send_status;
+    int pending_error;
+    socklen_t error_length;
 
     next_send = monotonic_milliseconds();
     if (next_send < 0)
@@ -41,7 +46,8 @@ int run_ping_loop(t_ping_context *ctx)
 
         if (now >= next_send)
         {
-            if (send_icmp_request(ctx) != 0)
+            send_status = send_icmp_request(ctx);
+            if (send_status < 0)
                 return -1;
 
             next_send += PING_INTERVAL_MS;
@@ -53,6 +59,7 @@ int run_ping_loop(t_ping_context *ctx)
         }
 
         pfd.revents = 0;
+
         ready = poll(&pfd, 1, (int)(next_send - now));
 
         if (ready < 0)
@@ -67,15 +74,41 @@ int run_ping_loop(t_ping_context *ctx)
         if (ready == 0)
             continue;
 
-        if (pfd.revents & POLLIN)
+        if (pfd.revents & POLLNVAL)
         {
-            if (receive_icmp_reply(ctx) != 0)
-                return -1;
+            fprintf(stderr, "ft_ping: invalid socket descriptor\n");
+            return -1;
         }
 
-        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))
+        if ((pfd.revents & POLLIN) &&
+            receive_icmp_reply(ctx) != 0)
+            return -1;
+
+        if (pfd.revents & POLLERR)
         {
-            fprintf(stderr, "ft_ping: socket poll error\n");
+            pending_error = 0;
+            error_length = sizeof(pending_error);
+
+            if (getsockopt(ctx->socket_fd,
+                           SOL_SOCKET,
+                           SO_ERROR,
+                           &pending_error,
+                           &error_length) == -1)
+            {
+                perror("ft_ping: getsockopt");
+                return -1;
+            }
+
+            if (pending_error != 0 && ctx->options.verbose)
+            {
+                fprintf(stderr, "ft_ping: socket error: %s\n",
+                        strerror(pending_error));
+            }
+        }
+
+        if (pfd.revents & POLLHUP)
+        {
+            fprintf(stderr, "ft_ping: socket hangup\n");
             return -1;
         }
     }

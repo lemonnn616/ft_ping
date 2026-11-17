@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#include <sys/types.h>
 
 #define PING_DEFAULT_PAYLOAD_SIZE 56
 #define PING_MAX_PAYLOAD_SIZE 65507
@@ -22,6 +23,7 @@ typedef struct s_ping_options
     const char *target;
     int verbose;
     size_t payload_size;
+    int ttl;
 } t_ping_options;
 
 /**
@@ -39,14 +41,15 @@ typedef struct s_ping_target
 /**
  * @brief Tracks one ICMP Echo Request.
  *
- * Stores its transmission timestamp and whether
- * a matching Echo Reply has already been received.
+ * Stores its transmission time and tracks whether
+ * a matching reply or ICMP error has been reported.
  */
 typedef struct s_ping_request
 {
     struct timespec sent_at;
     int sent;
     int received;
+    int error_reported;
 } t_ping_request;
 
 /**
@@ -130,5 +133,9 @@ int stop_requested(void);
 int run_ping_loop(t_ping_context *ctx);
 void update_rtt_stats(t_ping_stats *stats, double rtt_ms);
 void print_statistics(const t_ping_context *ctx);
+int process_icmp_error_packet(const uint8_t *packet,
+                              ssize_t count,
+                              t_ping_context *ctx);
+int configure_icmp_ttl(int fd, int ttl);
 
 #endif

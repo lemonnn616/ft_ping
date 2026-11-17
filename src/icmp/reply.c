@@ -7,7 +7,6 @@
 #include <string.h>
 #include <sys/socket.h>
 
-int is_duplicate;
 
 /**
  * @brief Stores metadata extracted from an ICMP Echo Reply.
@@ -97,6 +96,7 @@ int receive_icmp_reply(t_ping_context *ctx)
     t_reply_info reply;
     t_ping_request *request;
     double rtt_ms;
+    int is_duplicate;
 
     count = recvfrom(ctx->socket_fd, packet, sizeof(packet),
                      MSG_DONTWAIT, NULL, NULL);
@@ -113,6 +113,9 @@ int receive_icmp_reply(t_ping_context *ctx)
 
     if (get_monotonic_time(&received_at) != 0)
         return -1;
+
+    if (process_icmp_error_packet(packet, count, ctx))
+        return 0;
 
     if (!parse_echo_reply(packet, count, ctx, &reply))
         return 0;

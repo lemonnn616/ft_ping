@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <errno.h>
 
 /**
  * @brief Builds a complete ICMP Echo Request message.
@@ -62,15 +63,13 @@ static uint8_t *build_echo_request(const t_ping_context *ctx,
 /**
  * @brief Sends an ICMP Echo Request and records its timestamp.
  *
- * Builds the packet, records the send time, and transmits
- * it through the raw socket.
+ * Tracks successfully transmitted requests.
+ * Distinguishes recoverable network errors from fatal errors.
  *
- * After successful transmission, updates the request
- * tracking table and advances the sequence number.
- *
- * @param ctx Application context containing socket,
+ * @param ctx Application context containing the socket,
  * destination, and request tracking information.
- * @return 0 on successful transmission, -1 on error.
+ * @return 0 on success, 1 on recoverable network error,
+ * or -1 on fatal error.
  */
 int send_icmp_request(t_ping_context *ctx)
 {
@@ -79,6 +78,7 @@ int send_icmp_request(t_ping_context *ctx)
     struct timespec sent_at;
     ssize_t sent;
     t_ping_request *request;
+    int error_code;
 
     packet = build_echo_request(ctx, &packet_size);
     if (packet == NULL)
@@ -94,11 +94,23 @@ int send_icmp_request(t_ping_context *ctx)
                   (const struct sockaddr *)&ctx->target.address,
                   sizeof(ctx->target.address));
 
+    error_code = errno;
+
     free(packet);
 
     if (sent < 0)
     {
+        errno = error_code;
         perror("ft_ping: sendto");
+
+        if (error_code == EHOSTUNREACH ||
+            error_code == ENETUNREACH ||
+            error_code == EHOSTDOWN ||
+            error_code == ENETDOWN ||
+            error_code == EMSGSIZE ||
+            error_code == EPROTO)
+            return 1;
+
         return -1;
     }
 
@@ -113,6 +125,7 @@ int send_icmp_request(t_ping_context *ctx)
     request->sent_at = sent_at;
     request->sent = 1;
     request->received = 0;
+    request->error_reported = 0;
 
     ctx->stats.transmitted++;
     ctx->sequence++;

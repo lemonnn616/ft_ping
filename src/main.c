@@ -47,6 +47,13 @@ int main(int argc, char **argv)
     if (ctx.socket_fd == -1)
         return 1;
 
+    if (configure_icmp_ttl(ctx.socket_fd,
+                        ctx.options.ttl) != 0)
+    {
+        close(ctx.socket_fd);
+        return 1;
+    }
+
     ctx.requests = calloc(PING_SEQUENCE_COUNT,
                           sizeof(*ctx.requests));
 

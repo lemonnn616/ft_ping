@@ -29,3 +29,28 @@ int create_icmp_socket(void)
 
     return fd;
 }
+
+/**
+ * @brief Configures the TTL of outgoing IPv4 packets.
+ *
+ * Uses IP_TTL to configure the socket.
+ * A value of zero keeps the kernel's default TTL.
+ *
+ * @param fd Raw ICMP socket descriptor.
+ * @param ttl TTL from 1 to 255, or zero for default.
+ * @return 0 on success, -1 on failure.
+ */
+int configure_icmp_ttl(int fd, int ttl)
+{
+    if (ttl == 0)
+        return 0;
+
+    if (setsockopt(fd, IPPROTO_IP, IP_TTL,
+                   &ttl, sizeof(ttl)) == -1)
+    {
+        perror("ft_ping: setsockopt(IP_TTL)");
+        return -1;
+    }
+
+    return 0;
+}
