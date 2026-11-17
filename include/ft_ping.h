@@ -11,12 +11,13 @@
 #define PING_DEFAULT_PAYLOAD_SIZE 56
 #define PING_MAX_PAYLOAD_SIZE 65507
 #define PING_SEQUENCE_COUNT 65536U
+#define PING_DEFAULT_INTERVAL_MS 1000
 
 /**
- * @brief Stores the command-line configuration for ft_ping.
+ * @brief Stores command-line configuration for ft_ping.
  *
- * Contains the destination hostname and options controlling
- * ICMP packet construction and program behavior.
+ * Contains the destination, packet settings,
+ * transmission count, and sending interval.
  */
 typedef struct s_ping_options
 {
@@ -24,6 +25,8 @@ typedef struct s_ping_options
     int verbose;
     size_t payload_size;
     int ttl;
+    uint64_t count;
+    int interval_ms;
 } t_ping_options;
 
 /**

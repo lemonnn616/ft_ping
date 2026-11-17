@@ -5,6 +5,8 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <math.h>
 
 
 #define OPT_TTL 1000
@@ -66,6 +68,68 @@ static int parse_ttl(const char *value, int *ttl)
 }
 
 /**
+ * @brief Parses a non-negative unsigned integer.
+ *
+ * Rejects signs, invalid characters, empty values,
+ * and values outside the unsigned 64-bit range.
+ *
+ * @param value Input string.
+ * @param result Parsed number.
+ * @return 0 on success, -1 on error.
+ */
+static int parse_uint64(const char *value, uint64_t *result)
+{
+    char *end;
+    unsigned long long parsed;
+
+    if (value == NULL || value[0] < '0' || value[0] > '9')
+        return -1;
+
+    errno = 0;
+    parsed = strtoull(value, &end, 10);
+
+    if (errno != 0 || *end != '\0')
+        return -1;
+
+    *result = (uint64_t)parsed;
+    return 0;
+}
+
+/**
+ * @brief Parses a sending interval expressed in seconds.
+ *
+ * Converts the input into whole milliseconds.
+ *
+ * @param value Interval string.
+ * @param interval_ms Parsed interval in milliseconds.
+ * @return 0 on success, -1 on error.
+ */
+static int parse_interval(const char *value, int *interval_ms)
+{
+    char *end;
+    double seconds;
+    double milliseconds;
+
+    if (value == NULL || *value == '\0')
+        return -1;
+
+    errno = 0;
+    seconds = strtod(value, &end);
+
+    if (errno != 0 || *end != '\0' || !isfinite(seconds))
+        return -1;
+
+    milliseconds = seconds * 1000.0;
+
+    if (milliseconds < 1.0 || milliseconds > INT_MAX)
+        return -1;
+
+    *interval_ms = (int)(milliseconds + 0.5);
+
+    return 0;
+}
+
+/**
  * @brief Parses command-line options and validates the target.
  *
  * Supports -v, --verbose, -?, --help, and --ttl.
@@ -89,17 +153,24 @@ t_parse_result parse_options(
         {"verbose", no_argument, NULL, 'v'},
         {"help", no_argument, NULL, 'h'},
         {"ttl", required_argument, NULL, OPT_TTL},
+        {"count", required_argument, NULL, 'c'},
+        {"interval", required_argument, NULL, 'i'},
+        {"size", required_argument, NULL, 's'},
         {NULL, 0, NULL, 0}
     };
 
     int opt;
+    uint64_t number;
 
     options->payload_size = PING_DEFAULT_PAYLOAD_SIZE;
+    options->interval_ms = PING_DEFAULT_INTERVAL_MS;
+    options->count = 0;
     options->ttl = 0;
+    options->verbose = 0;
     opterr = 0;
 
-    while ((opt = getopt_long(argc, argv, "v?",
-                             long_options, NULL)) != -1)
+    while ((opt = getopt_long(argc, argv, "v?c:i:s:",
+                            long_options, NULL)) != -1)
     {
         if (opt == 'v')
             options->verbose = 1;
@@ -116,6 +187,35 @@ t_parse_result parse_options(
                         "ft_ping: invalid TTL (expected 1..255)\n");
                 return PARSE_ERROR;
             }
+        }
+        else if (opt == 'c')
+        {
+            if (parse_uint64(optarg, &number) != 0 || number == 0)
+            {
+                fprintf(stderr, "ft_ping: invalid packet count\n");
+                return PARSE_ERROR;
+            }
+
+            options->count = number;
+        }
+        else if (opt == 'i')
+        {
+            if (parse_interval(optarg, &options->interval_ms) != 0)
+            {
+                fprintf(stderr, "ft_ping: invalid interval\n");
+                return PARSE_ERROR;
+            }
+        }
+        else if (opt == 's')
+        {
+            if (parse_uint64(optarg, &number) != 0 ||
+                number > PING_MAX_PAYLOAD_SIZE)
+            {
+                fprintf(stderr, "ft_ping: invalid payload size\n");
+                return PARSE_ERROR;
+            }
+
+            options->payload_size = (size_t)number;
         }
         else
         {

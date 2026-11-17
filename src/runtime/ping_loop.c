@@ -6,19 +6,50 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#define PING_INTERVAL_MS 1000
+#define PING_FINAL_WAIT_MS 1000
 
 /**
- * @brief Runs the continuous ICMP send/receive loop.
+ * @brief Handles a pending socket error.
  *
- * Sends Echo Requests every second and processes incoming
- * ICMP packets independently of the send schedule.
+ * Reads and clears SO_ERROR. Reports the error
+ * when verbose output is enabled.
  *
- * Handles recoverable socket errors without stopping
- * the application.
+ * @param ctx Application context containing the socket.
+ * @return 0 on success, -1 on getsockopt failure.
+ */
+static int handle_socket_error(const t_ping_context *ctx)
+{
+    int pending_error = 0;
+    socklen_t length = sizeof(pending_error);
+
+    if (getsockopt(ctx->socket_fd, SOL_SOCKET, SO_ERROR,
+                   &pending_error, &length) == -1)
+    {
+        perror("ft_ping: getsockopt");
+        return -1;
+    }
+
+    if (pending_error != 0 && ctx->options.verbose)
+    {
+        fprintf(stderr, "ft_ping: socket error: %s\n",
+                strerror(pending_error));
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Runs the continuous ICMP ping loop.
  *
- * @param ctx Initialized ping application context.
- * @return 0 after graceful shutdown, -1 on fatal error.
+ * Sends requests according to the configured interval.
+ * When the requested count is reached, stops sending
+ * but continues waiting for outstanding replies.
+ *
+ * Uses poll() to process incoming packets without
+ * blocking the next scheduled transmission.
+ *
+ * @param ctx Initialized application context.
+ * @return 0 after normal termination, -1 on fatal error.
  */
 int run_ping_loop(t_ping_context *ctx)
 {
@@ -28,11 +59,14 @@ int run_ping_loop(t_ping_context *ctx)
     };
 
     int64_t next_send;
+    int64_t final_deadline = 0;
     int64_t now;
+    int64_t wake_at;
+    uint64_t attempts = 0;
+
+    int sending_done = 0;
     int ready;
     int send_status;
-    int pending_error;
-    socklen_t error_length;
 
     next_send = monotonic_milliseconds();
     if (next_send < 0)
@@ -44,23 +78,53 @@ int run_ping_loop(t_ping_context *ctx)
         if (now < 0)
             return -1;
 
-        if (now >= next_send)
+        if (sending_done)
         {
-            send_status = send_icmp_request(ctx);
-            if (send_status < 0)
-                return -1;
+            if (ctx->stats.received == ctx->stats.transmitted)
+                break;
 
-            next_send += PING_INTERVAL_MS;
+            if (now >= final_deadline)
+                break;
 
-            if (next_send <= now)
-                next_send = now + PING_INTERVAL_MS;
+            wake_at = final_deadline;
+        }
+        else
+        {
+            if (now >= next_send)
+            {
+                send_status = send_icmp_request(ctx);
+                if (send_status < 0)
+                    return -1;
 
-            continue;
+                attempts++;
+
+                if (ctx->options.count > 0 &&
+                    attempts >= ctx->options.count)
+                {
+                    sending_done = 1;
+
+                    now = monotonic_milliseconds();
+                    if (now < 0)
+                        return -1;
+
+                    final_deadline = now + PING_FINAL_WAIT_MS;
+                }
+                else
+                {
+                    next_send += ctx->options.interval_ms;
+
+                    if (next_send <= now)
+                        next_send = now + ctx->options.interval_ms;
+                }
+
+                continue;
+            }
+
+            wake_at = next_send;
         }
 
         pfd.revents = 0;
-
-        ready = poll(&pfd, 1, (int)(next_send - now));
+        ready = poll(&pfd, 1, (int)(wake_at - now));
 
         if (ready < 0)
         {
@@ -80,30 +144,16 @@ int run_ping_loop(t_ping_context *ctx)
             return -1;
         }
 
-        if ((pfd.revents & POLLIN) &&
-            receive_icmp_reply(ctx) != 0)
-            return -1;
+        if (pfd.revents & POLLIN)
+        {
+            if (receive_icmp_reply(ctx) != 0)
+                return -1;
+        }
 
         if (pfd.revents & POLLERR)
         {
-            pending_error = 0;
-            error_length = sizeof(pending_error);
-
-            if (getsockopt(ctx->socket_fd,
-                           SOL_SOCKET,
-                           SO_ERROR,
-                           &pending_error,
-                           &error_length) == -1)
-            {
-                perror("ft_ping: getsockopt");
+            if (handle_socket_error(ctx) != 0)
                 return -1;
-            }
-
-            if (pending_error != 0 && ctx->options.verbose)
-            {
-                fprintf(stderr, "ft_ping: socket error: %s\n",
-                        strerror(pending_error));
-            }
         }
 
         if (pfd.revents & POLLHUP)
