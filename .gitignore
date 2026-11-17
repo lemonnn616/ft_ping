@@ -1,0 +1,28 @@
+# Compiled files
+ft_ping
+*.o
+*.a
+*.so
+*.d
+
+# Debugging
+core
+core.*
+vgcore.*
+*.log
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local configuration
+.env
+.env.*
+!.env.example
