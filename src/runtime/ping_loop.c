@@ -6,8 +6,6 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#define PING_FINAL_WAIT_MS 1000
-
 /**
  * @brief Handles a pending socket error.
  *
@@ -39,17 +37,18 @@ static int handle_socket_error(const t_ping_context *ctx)
 }
 
 /**
- * @brief Runs the continuous ICMP ping loop.
+ * @brief Runs the ICMP ping event loop.
  *
- * Sends requests according to the configured interval.
- * When the requested count is reached, stops sending
- * but continues waiting for outstanding replies.
+ * Sends packets according to the configured interval.
+ * Stops sending when the count or timeout limit is reached.
  *
- * Uses poll() to process incoming packets without
- * blocking the next scheduled transmission.
+ * After sending stops, continues receiving replies until
+ * all transmitted packets are answered or linger expires.
+ *
+ * Uses poll() to wait for socket events and deadlines.
  *
  * @param ctx Initialized application context.
- * @return 0 after normal termination, -1 on fatal error.
+ * @return 0 on normal termination, -1 on fatal error.
  */
 int run_ping_loop(t_ping_context *ctx)
 {
@@ -59,6 +58,7 @@ int run_ping_loop(t_ping_context *ctx)
     };
 
     int64_t next_send;
+    int64_t timeout_deadline = INT64_MAX;
     int64_t final_deadline = 0;
     int64_t now;
     int64_t wake_at;
@@ -72,11 +72,20 @@ int run_ping_loop(t_ping_context *ctx)
     if (next_send < 0)
         return -1;
 
+    if (ctx->options.timeout_ms > 0)
+        timeout_deadline = next_send + ctx->options.timeout_ms;
+
     while (!stop_requested())
     {
         now = monotonic_milliseconds();
         if (now < 0)
             return -1;
+
+        if (!sending_done && now >= timeout_deadline)
+        {
+            sending_done = 1;
+            final_deadline = now + ctx->options.linger_ms;
+        }
 
         if (sending_done)
         {
@@ -98,16 +107,15 @@ int run_ping_loop(t_ping_context *ctx)
 
                 attempts++;
 
+                now = monotonic_milliseconds();
+                if (now < 0)
+                    return -1;
+
                 if (ctx->options.count > 0 &&
                     attempts >= ctx->options.count)
                 {
                     sending_done = 1;
-
-                    now = monotonic_milliseconds();
-                    if (now < 0)
-                        return -1;
-
-                    final_deadline = now + PING_FINAL_WAIT_MS;
+                    final_deadline = now + ctx->options.linger_ms;
                 }
                 else
                 {
@@ -121,9 +129,13 @@ int run_ping_loop(t_ping_context *ctx)
             }
 
             wake_at = next_send;
+
+            if (timeout_deadline < wake_at)
+                wake_at = timeout_deadline;
         }
 
         pfd.revents = 0;
+
         ready = poll(&pfd, 1, (int)(wake_at - now));
 
         if (ready < 0)
@@ -140,7 +152,8 @@ int run_ping_loop(t_ping_context *ctx)
 
         if (pfd.revents & POLLNVAL)
         {
-            fprintf(stderr, "ft_ping: invalid socket descriptor\n");
+            fprintf(stderr,
+                    "ft_ping: invalid socket descriptor\n");
             return -1;
         }
 

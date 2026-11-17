@@ -12,12 +12,13 @@
 #define PING_MAX_PAYLOAD_SIZE 65507
 #define PING_SEQUENCE_COUNT 65536U
 #define PING_DEFAULT_INTERVAL_MS 1000
+#define PING_DEFAULT_LINGER_MS 1000
 
 /**
  * @brief Stores command-line configuration for ft_ping.
  *
- * Contains the destination, packet settings,
- * transmission count, and sending interval.
+ * Contains the destination, packet settings, transmission
+ * limits, scheduling interval, and timeout configuration.
  */
 typedef struct s_ping_options
 {
@@ -27,6 +28,8 @@ typedef struct s_ping_options
     int ttl;
     uint64_t count;
     int interval_ms;
+    int timeout_ms;
+    int linger_ms;
 } t_ping_options;
 
 /**

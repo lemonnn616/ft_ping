@@ -17,8 +17,10 @@ void print_help(void)
     printf("Options:\n");
     printf("  -v, --verbose    Verbose output\n");
     printf("  -?, --help       Display this help message\n");
-    printf("      --ttl=N      Set IPv4 time-to-live\n");
     printf("  -c, --count=N       Stop after N requests\n");
     printf("  -i, --interval=SEC  Time between requests\n");
     printf("  -s, --size=BYTES    ICMP payload size\n");
+    printf("  -w, --timeout=N     Stop sending after N seconds\n");
+    printf("  -W, --linger=N      Wait up to N seconds for replies\n");
+    printf("      --ttl=N      Set IPv4 time-to-live\n");
 }

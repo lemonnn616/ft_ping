@@ -130,6 +130,36 @@ static int parse_interval(const char *value, int *interval_ms)
 }
 
 /**
+ * @brief Parses a duration expressed in whole seconds.
+ *
+ * Converts seconds to milliseconds and prevents integer
+ * overflow when the result is used by poll().
+ *
+ * @param value Input duration string.
+ * @param result_ms Parsed duration in milliseconds.
+ * @param allow_zero Whether zero is an accepted value.
+ * @return 0 on success, -1 on invalid input.
+ */
+static int parse_seconds(const char *value, int *result_ms,
+                         int allow_zero)
+{
+    uint64_t seconds;
+
+    if (parse_uint64(value, &seconds) != 0)
+        return -1;
+
+    if (!allow_zero && seconds == 0)
+        return -1;
+
+    if (seconds > INT_MAX / 1000)
+        return -1;
+
+    *result_ms = (int)(seconds * 1000);
+
+    return 0;
+}
+
+/**
  * @brief Parses command-line options and validates the target.
  *
  * Supports -v, --verbose, -?, --help, and --ttl.
@@ -156,6 +186,8 @@ t_parse_result parse_options(
         {"count", required_argument, NULL, 'c'},
         {"interval", required_argument, NULL, 'i'},
         {"size", required_argument, NULL, 's'},
+        {"timeout", required_argument, NULL, 'w'},
+        {"linger", required_argument, NULL, 'W'},
         {NULL, 0, NULL, 0}
     };
 
@@ -167,9 +199,11 @@ t_parse_result parse_options(
     options->count = 0;
     options->ttl = 0;
     options->verbose = 0;
+    options->timeout_ms = 0;
+    options->linger_ms = PING_DEFAULT_LINGER_MS;
     opterr = 0;
 
-    while ((opt = getopt_long(argc, argv, "v?c:i:s:",
+    while ((opt = getopt_long(argc, argv, "v?c:i:s:w:W:",
                             long_options, NULL)) != -1)
     {
         if (opt == 'v')
@@ -216,6 +250,22 @@ t_parse_result parse_options(
             }
 
             options->payload_size = (size_t)number;
+        }
+        else if (opt == 'w')
+        {
+            if (parse_seconds(optarg, &options->timeout_ms, 0) != 0)
+            {
+                fprintf(stderr, "ft_ping: invalid timeout\n");
+                return PARSE_ERROR;
+            }
+        }
+        else if (opt == 'W')
+        {
+            if (parse_seconds(optarg, &options->linger_ms, 1) != 0)
+            {
+                fprintf(stderr, "ft_ping: invalid linger time\n");
+                return PARSE_ERROR;
+            }
         }
         else
         {
