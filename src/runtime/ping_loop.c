@@ -37,18 +37,17 @@ static int handle_socket_error(const t_ping_context *ctx)
 }
 
 /**
- * @brief Runs the ICMP ping event loop.
+ * @brief Sends ICMP requests and processes replies using poll().
  *
- * Sends packets according to the configured interval.
- * Stops sending when the count or timeout limit is reached.
+ * -w is an absolute deadline: when it coincides with a scheduled
+ * transmission, that last request is sent before exiting, as
+ * observed with GNU inetutils 2.0.
  *
- * After sending stops, continues receiving replies until
- * all transmitted packets are answered or linger expires.
- *
- * Uses poll() to wait for socket events and deadlines.
+ * After -c, the receive-only linger period starts at the next
+ * scheduled send slot, not immediately after sendto().
  *
  * @param ctx Initialized application context.
- * @return 0 on normal termination, -1 on fatal error.
+ * @return 0 after normal termination, -1 on fatal error.
  */
 int run_ping_loop(t_ping_context *ctx)
 {
@@ -63,7 +62,6 @@ int run_ping_loop(t_ping_context *ctx)
     int64_t now;
     int64_t wake_at;
     uint64_t attempts = 0;
-
     int sending_done = 0;
     int ready;
     int send_status;
@@ -81,61 +79,63 @@ int run_ping_loop(t_ping_context *ctx)
         if (now < 0)
             return -1;
 
-        if (!sending_done && now >= timeout_deadline)
+        /*
+         * The -w deadline is a hard stop; it does not start a
+         * new -W wait. Include a transmission scheduled exactly
+         * at the deadline before printing final statistics.
+         */
+        if (now >= timeout_deadline)
         {
-            sending_done = 1;
-            final_deadline = now + ctx->options.linger_ms;
+            if (!sending_done && now >= next_send &&
+                next_send <= timeout_deadline)
+            {
+                if (send_icmp_request(ctx) < 0)
+                    return -1;
+            }
+            break;
         }
 
         if (sending_done)
         {
-            if (ctx->stats.received == ctx->stats.transmitted)
-                break;
-
-            if (now >= final_deadline)
+            if (ctx->stats.received == ctx->stats.transmitted ||
+                now >= final_deadline)
                 break;
 
             wake_at = final_deadline;
         }
+        else if (now >= next_send)
+        {
+            send_status = send_icmp_request(ctx);
+            if (send_status < 0)
+                return -1;
+
+            attempts++;
+
+            now = monotonic_milliseconds();
+            if (now < 0)
+                return -1;
+
+            next_send += ctx->options.interval_ms;
+            if (next_send <= now)
+                next_send = now + ctx->options.interval_ms;
+
+            if (ctx->options.count > 0 &&
+                attempts >= ctx->options.count)
+            {
+                sending_done = 1;
+                final_deadline = next_send + ctx->options.linger_ms;
+            }
+            continue;
+        }
         else
         {
-            if (now >= next_send)
-            {
-                send_status = send_icmp_request(ctx);
-                if (send_status < 0)
-                    return -1;
-
-                attempts++;
-
-                now = monotonic_milliseconds();
-                if (now < 0)
-                    return -1;
-
-                if (ctx->options.count > 0 &&
-                    attempts >= ctx->options.count)
-                {
-                    sending_done = 1;
-                    final_deadline = now + ctx->options.linger_ms;
-                }
-                else
-                {
-                    next_send += ctx->options.interval_ms;
-
-                    if (next_send <= now)
-                        next_send = now + ctx->options.interval_ms;
-                }
-
-                continue;
-            }
-
             wake_at = next_send;
-
-            if (timeout_deadline < wake_at)
-                wake_at = timeout_deadline;
         }
 
-        pfd.revents = 0;
+        if (timeout_deadline < wake_at)
+            wake_at = timeout_deadline;
 
+        pfd.revents = 0;
         ready = poll(&pfd, 1, (int)(wake_at - now));
 
         if (ready < 0)
@@ -152,16 +152,13 @@ int run_ping_loop(t_ping_context *ctx)
 
         if (pfd.revents & POLLNVAL)
         {
-            fprintf(stderr,
-                    "ft_ping: invalid socket descriptor\n");
+            fprintf(stderr, "ft_ping: invalid socket descriptor\n");
             return -1;
         }
 
-        if (pfd.revents & POLLIN)
-        {
-            if (receive_icmp_reply(ctx) != 0)
-                return -1;
-        }
+        if ((pfd.revents & POLLIN) &&
+            receive_icmp_reply(ctx) != 0)
+            return -1;
 
         if (pfd.revents & POLLERR)
         {
