@@ -6,7 +6,9 @@ CFLAGS = -Wall -Wextra -Werror -g3
 
 CPPFLAGS = -Iinclude
 
-SRC = src/main.c
+SRC = src/main.c \
+      src/options/parse_options.c \
+      src/options/print_help.c
 
 OBJ = $(SRC:src/%.c=build/%.o)
 
