@@ -59,6 +59,7 @@ t_parse_result parse_options(
 
     int opt;
 
+    options->payload_size = PING_DEFAULT_PAYLOAD_SIZE;
     opterr = 0;
 
     while ((opt = getopt_long(argc, argv, "v?",

@@ -10,7 +10,9 @@ SRC = src/main.c \
       src/options/parse_options.c \
       src/options/print_help.c \
       src/network/resolve.c \
-      src/network/socket.c
+      src/network/socket.c \
+      src/icmp/checksum.c \
+      src/icmp/request.c
 
 OBJ = $(SRC:src/%.c=build/%.o)
 

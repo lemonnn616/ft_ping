@@ -6,16 +6,17 @@
 /**
  * @brief Entry point of the ft_ping application.
  *
- * Parses command-line arguments, resolves the IPv4 target,
- * creates an ICMP raw socket, and releases its resources.
+ * Parses arguments, resolves the target, creates a raw socket,
+ * and sends one ICMP Echo Request.
  *
- * Packet transmission will be implemented in the next step.
+ * Receiving ICMP replies will be implemented in the next step.
  *
  * @param argc Number of command-line arguments.
  * @param argv Array of command-line argument strings.
  *
  * @return 0 if help was requested.
- * @return 1 if initialization fails or ping is not implemented.
+ * @return 1 on initialization or transmission failure,
+ * or when reaching the unimplemented reply-handling stage.
  * @return 2 if command-line arguments are invalid.
  */
 int main(int argc, char **argv)
@@ -40,16 +41,23 @@ int main(int argc, char **argv)
         return 1;
 
     ctx.socket_fd = create_icmp_socket();
-
     if (ctx.socket_fd == -1)
         return 1;
 
-    printf("Target: %s\n", ctx.options.target);
-    printf("IPv4: %s\n", ctx.target.ip_string);
-    printf("Verbose: %s\n",
-           ctx.options.verbose ? "yes" : "no");
+    ctx.identifier = (uint16_t)getpid();
+    ctx.sequence = 1;
 
-    printf("ICMP raw socket created (fd=%d)\n", ctx.socket_fd);
+    if (send_icmp_request(&ctx) != 0)
+    {
+        close(ctx.socket_fd);
+        return 1;
+    }
+
+    printf("Sent ICMP Echo Request to %s\n",
+           ctx.target.ip_string);
+
+    printf("Identifier: %u, Sequence: %u\n",
+           ctx.identifier, ctx.sequence);
 
     if (close(ctx.socket_fd) == -1)
     {
@@ -57,10 +65,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    ctx.socket_fd = -1;
-
-    printf("Socket closed successfully.\n");
-    printf("ft_ping: packet transmission not implemented yet\n");
+    fprintf(stderr, "ft_ping: reply handling not implemented yet\n");
 
     return 1;
 }

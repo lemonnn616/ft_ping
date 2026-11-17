@@ -3,17 +3,23 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#define PING_DEFAULT_PAYLOAD_SIZE 56
+#define PING_MAX_PAYLOAD_SIZE 65507
 
 /**
- * @brief Stores command-line configuration for ft_ping.
+ * @brief Stores the command-line configuration for ft_ping.
  *
- * Contains user-provided options that control ping behavior.
- * Additional fields will be added for bonus features.
+ * Contains the destination hostname and options controlling
+ * ICMP packet construction and program behavior.
  */
 typedef struct s_ping_options
 {
     const char *target;
     int verbose;
+    size_t payload_size;
 } t_ping_options;
 
 /**
@@ -29,19 +35,18 @@ typedef struct s_ping_target
 } t_ping_target;
 
 /**
- * @brief Stores the runtime state of the ping application.
+ * @brief Stores the complete runtime state of ft_ping.
  *
- * Groups command-line options, resolved destination,
- * and the ICMP socket descriptor.
- *
- * Additional fields will be added for packet tracking,
- * timing, and statistics.
+ * Contains application settings, the resolved destination,
+ * the ICMP socket, and identifiers for outgoing requests.
  */
 typedef struct s_ping_context
 {
     t_ping_options options;
     t_ping_target target;
     int socket_fd;
+    uint16_t identifier;
+    uint16_t sequence;
 } t_ping_context;
 
 /**
@@ -71,38 +76,11 @@ t_parse_result parse_options(
     t_ping_options *options
 );
 
-/**
- * @brief Prints the available command-line options.
- *
- * @return Nothing (void).
- */
+
 void print_help(void);
-
-/**
- * @brief Resolves a hostname or IPv4 string to an IPv4 address.
- *
- * Uses getaddrinfo() to obtain a binary IPv4 socket address
- * and inet_ntop() to generate its printable representation.
- *
- * @param hostname Hostname or IPv4 address to resolve.
- * @param target Output structure for the resolved address.
- *
- * @return 0 on success, -1 on failure.
- */
 int resolve_target(const char *hostname, t_ping_target *target);
-
-/**
- * @brief Creates an IPv4 raw socket for ICMP communication.
- *
- * Opens a socket using AF_INET, SOCK_RAW, and IPPROTO_ICMP.
- * The Linux kernel will generate the IPv4 header for
- * outgoing packets.
- *
- * Requires CAP_NET_RAW capability.
- *
- * @return A non-negative socket descriptor on success.
- * @return -1 on failure, with an error message printed.
- */
 int create_icmp_socket(void);
+uint16_t icmp_checksum(const void *data, size_t length);
+int send_icmp_request(t_ping_context *ctx);
 
 #endif
