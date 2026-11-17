@@ -29,6 +29,22 @@ typedef struct s_ping_target
 } t_ping_target;
 
 /**
+ * @brief Stores the runtime state of the ping application.
+ *
+ * Groups command-line options, resolved destination,
+ * and the ICMP socket descriptor.
+ *
+ * Additional fields will be added for packet tracking,
+ * timing, and statistics.
+ */
+typedef struct s_ping_context
+{
+    t_ping_options options;
+    t_ping_target target;
+    int socket_fd;
+} t_ping_context;
+
+/**
  * @brief Represents possible command-line parsing results.
  */
 typedef enum e_parse_result
@@ -74,5 +90,19 @@ void print_help(void);
  * @return 0 on success, -1 on failure.
  */
 int resolve_target(const char *hostname, t_ping_target *target);
+
+/**
+ * @brief Creates an IPv4 raw socket for ICMP communication.
+ *
+ * Opens a socket using AF_INET, SOCK_RAW, and IPPROTO_ICMP.
+ * The Linux kernel will generate the IPv4 header for
+ * outgoing packets.
+ *
+ * Requires CAP_NET_RAW capability.
+ *
+ * @return A non-negative socket descriptor on success.
+ * @return -1 on failure, with an error message printed.
+ */
+int create_icmp_socket(void);
 
 #endif

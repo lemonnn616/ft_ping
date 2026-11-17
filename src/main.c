@@ -1,28 +1,31 @@
 #include "ft_ping.h"
 
 #include <stdio.h>
+#include <unistd.h>
 
 /**
  * @brief Entry point of the ft_ping application.
  *
- * Parses command-line arguments and resolves the destination
- * to an IPv4 address. Packet transmission will be implemented
- * in a later development stage.
+ * Parses command-line arguments, resolves the IPv4 target,
+ * creates an ICMP raw socket, and releases its resources.
+ *
+ * Packet transmission will be implemented in the next step.
  *
  * @param argc Number of command-line arguments.
  * @param argv Array of command-line argument strings.
  *
  * @return 0 if help was requested.
- * @return 1 if resolution fails or ping is not implemented.
+ * @return 1 if initialization fails or ping is not implemented.
  * @return 2 if command-line arguments are invalid.
  */
 int main(int argc, char **argv)
 {
-    t_ping_options options = {0};
-    t_ping_target target = {0};
+    t_ping_context ctx = {0};
     t_parse_result result;
 
-    result = parse_options(argc, argv, &options);
+    ctx.socket_fd = -1;
+
+    result = parse_options(argc, argv, &ctx.options);
 
     if (result == PARSE_HELP)
     {
@@ -33,14 +36,31 @@ int main(int argc, char **argv)
     if (result == PARSE_ERROR)
         return 2;
 
-    if (resolve_target(options.target, &target) != 0)
+    if (resolve_target(ctx.options.target, &ctx.target) != 0)
         return 1;
 
-    printf("Target: %s\n", options.target);
-    printf("IPv4: %s\n", target.ip_string);
-    printf("Verbose: %s\n", options.verbose ? "yes" : "no");
+    ctx.socket_fd = create_icmp_socket();
 
-    fprintf(stderr, "ft_ping: ICMP not implemented yet\n");
+    if (ctx.socket_fd == -1)
+        return 1;
+
+    printf("Target: %s\n", ctx.options.target);
+    printf("IPv4: %s\n", ctx.target.ip_string);
+    printf("Verbose: %s\n",
+           ctx.options.verbose ? "yes" : "no");
+
+    printf("ICMP raw socket created (fd=%d)\n", ctx.socket_fd);
+
+    if (close(ctx.socket_fd) == -1)
+    {
+        perror("ft_ping: close");
+        return 1;
+    }
+
+    ctx.socket_fd = -1;
+
+    printf("Socket closed successfully.\n");
+    printf("ft_ping: packet transmission not implemented yet\n");
 
     return 1;
 }
