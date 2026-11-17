@@ -55,6 +55,21 @@ sudo ./ft_ping -c 5 -i 0.2 -s 128 1.1.1.1
 
 Without a count or time limit, the program keeps sending requests until interrupted with **Ctrl+C**. A typical run displays each reply and ends with transmission, loss, and RTT statistics.
 
+### Example output
+
+```text
+$ sudo ./ft_ping -c 3 127.0.0.1
+PING 127.0.0.1 (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=0.096 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.173 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.138 ms
+--- 127.0.0.1 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.096/0.136/0.173/0.031 ms
+```
+
+RTT values and other network-dependent fields will vary.
+
 ## Command-line options
 
 ```text
