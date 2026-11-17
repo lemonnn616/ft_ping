@@ -20,6 +20,8 @@ void print_help(void)
     printf("  -c, --count=N       Stop after N requests\n");
     printf("  -i, --interval=SEC  Time between requests\n");
     printf("  -s, --size=BYTES    ICMP payload size\n");
+    printf("  -n, --numeric       Numeric-only reply addresses\n");
+    printf("  -p, --pattern=HEX   Repeat 1..16 hex bytes in payload\n");
     printf("  -w, --timeout=N     Stop sending after N seconds\n");
     printf("  -W, --linger=N      Wait up to N seconds for replies\n");
     printf("      --ttl=N      Set IPv4 time-to-live\n");

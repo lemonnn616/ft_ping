@@ -12,6 +12,8 @@
 #define PING_MAX_PAYLOAD_SIZE 65507
 #define PING_SEQUENCE_COUNT 65536U
 #define PING_DEFAULT_INTERVAL_MS 1000
+#define PING_PATTERN_MAX_BYTES 16
+#define PING_REPLY_DISPLAY_SIZE 320
 #define PING_DEFAULT_LINGER_MS 1000
 
 /**
@@ -28,6 +30,9 @@ typedef struct s_ping_options
     int ttl;
     uint64_t count;
     int interval_ms;
+    int numeric;
+    uint8_t pattern[PING_PATTERN_MAX_BYTES];
+    size_t pattern_length;
     int timeout_ms;
     int linger_ms;
 } t_ping_options;
@@ -42,6 +47,7 @@ typedef struct s_ping_target
 {
     struct sockaddr_in address;
     char ip_string[INET_ADDRSTRLEN];
+    char reply_display[PING_REPLY_DISPLAY_SIZE];
 } t_ping_target;
 
 /**
@@ -126,6 +132,14 @@ t_parse_result parse_options(
 
 void print_help(void);
 int resolve_target(const char *hostname, t_ping_target *target);
+/**
+ * @brief Prepares a cached reply display name before packet reception.
+ *
+ * @param options CLI configuration including the numeric flag.
+ * @param target Resolved target to update.
+ */
+void prepare_reply_display(const t_ping_options *options,
+                           t_ping_target *target);
 int create_icmp_socket(void);
 uint16_t icmp_checksum(const void *data, size_t length);
 int send_icmp_request(t_ping_context *ctx);

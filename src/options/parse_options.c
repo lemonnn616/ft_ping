@@ -160,9 +160,65 @@ static int parse_seconds(const char *value, int *result_ms,
 }
 
 /**
+ * @brief Converts a hexadecimal digit to its value.
+ *
+ * @param digit ASCII hexadecimal character.
+ * @return Value 0..15, or -1 if invalid.
+ */
+static int hex_digit(char digit)
+{
+    if (digit >= '0' && digit <= '9')
+        return digit - '0';
+    if (digit >= 'a' && digit <= 'f')
+        return digit - 'a' + 10;
+    if (digit >= 'A' && digit <= 'F')
+        return digit - 'A' + 10;
+    return -1;
+}
+
+/**
+ * @brief Parses a one-to-sixteen-byte hexadecimal pad pattern.
+ *
+ * Requires an even number of hexadecimal digits and stores
+ * binary bytes for repeating inside each outgoing Echo Request.
+ *
+ * @param input Hexadecimal string from -p.
+ * @param options Options receiving the parsed bytes.
+ * @return 0 on success, -1 on invalid input.
+ */
+static int parse_pattern(const char *input, t_ping_options *options)
+{
+    size_t length;
+    size_t i;
+    int high;
+    int low;
+
+    if (input == NULL)
+        return -1;
+
+    length = strlen(input);
+    if (length == 0 || length > PING_PATTERN_MAX_BYTES * 2 ||
+        length % 2 != 0)
+        return -1;
+
+    for (i = 0; i < length / 2; i++)
+    {
+        high = hex_digit(input[i * 2]);
+        low = hex_digit(input[i * 2 + 1]);
+        if (high < 0 || low < 0)
+            return -1;
+
+        options->pattern[i] = (uint8_t)((high << 4) | low);
+    }
+
+    options->pattern_length = length / 2;
+    return 0;
+}
+
+/**
  * @brief Parses command-line options and validates the target.
  *
- * Supports -v, --verbose, -?, --help, and --ttl.
+ * Supports ICMP scheduling, numeric output, and hex patterns.
  * Stores the target hostname and parsed settings in options.
  *
  * @param argc Number of command-line arguments.
@@ -181,6 +237,8 @@ t_parse_result parse_options(
 {
     static const struct option long_options[] = {
         {"verbose", no_argument, NULL, 'v'},
+        {"numeric", no_argument, NULL, 'n'},
+        {"pattern", required_argument, NULL, 'p'},
         {"help", no_argument, NULL, 'h'},
         {"ttl", required_argument, NULL, OPT_TTL},
         {"count", required_argument, NULL, 'c'},
@@ -199,15 +257,19 @@ t_parse_result parse_options(
     options->count = 0;
     options->ttl = 0;
     options->verbose = 0;
+    options->numeric = 0;
+    options->pattern_length = 0;
     options->timeout_ms = 0;
     options->linger_ms = PING_DEFAULT_LINGER_MS;
     opterr = 0;
 
-    while ((opt = getopt_long(argc, argv, "v?c:i:s:w:W:",
+    while ((opt = getopt_long(argc, argv, "v?nc:i:s:w:W:p:",
                             long_options, NULL)) != -1)
     {
         if (opt == 'v')
             options->verbose = 1;
+        else if (opt == 'n')
+            options->numeric = 1;
         else if (opt == 'h')
             return PARSE_HELP;
         else if (opt == '?' && optopt == 0 &&
@@ -237,6 +299,14 @@ t_parse_result parse_options(
             if (parse_interval(optarg, &options->interval_ms) != 0)
             {
                 fprintf(stderr, "ft_ping: invalid interval\n");
+                return PARSE_ERROR;
+            }
+        }
+        else if (opt == 'p')
+        {
+            if (parse_pattern(optarg, options) != 0)
+            {
+                fprintf(stderr, "ft_ping: invalid pattern (1..16 hex bytes)\n");
                 return PARSE_ERROR;
             }
         }

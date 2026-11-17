@@ -143,7 +143,7 @@ int receive_icmp_reply(t_ping_context *ctx)
 
     printf("%zu bytes from %s: icmp_seq=%u ttl=%u time=%.3f ms%s\n",
         reply.icmp_length,
-        ctx->target.ip_string,
+        ctx->target.reply_display,
         (unsigned)reply.sequence,
         (unsigned)reply.ttl,
         rtt_ms,

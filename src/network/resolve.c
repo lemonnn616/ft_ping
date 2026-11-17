@@ -60,3 +60,39 @@ int resolve_target(const char *hostname, t_ping_target *target)
 
     return 0;
 }
+/**
+ * @brief Caches the source label before the ping receive loop.
+ *
+ * -n uses numeric IPv4. Otherwise, a reverse DNS lookup is
+ * attempted once for hostname targets; if it fails, use the
+ * originally requested hostname. No DNS runs on packet receipt.
+ *
+ * @param options Parsed command-line options.
+ * @param target Resolved IPv4 destination and display text.
+ */
+void prepare_reply_display(const t_ping_options *options,
+                           t_ping_target *target)
+{
+    struct in_addr numeric_address;
+    char hostname[256];
+    int result;
+
+    snprintf(target->reply_display, sizeof(target->reply_display),
+             "%s", target->ip_string);
+
+    if (options->numeric ||
+        inet_pton(AF_INET, options->target, &numeric_address) == 1)
+        return;
+
+    result = getnameinfo((const struct sockaddr *)&target->address,
+                         sizeof(target->address),
+                         hostname, sizeof(hostname),
+                         NULL, 0, NI_NAMEREQD);
+
+    if (result == 0)
+        snprintf(target->reply_display, sizeof(target->reply_display),
+                 "%s (%s)", hostname, target->ip_string);
+    else
+        snprintf(target->reply_display, sizeof(target->reply_display),
+                 "%s (%s)", options->target, target->ip_string);
+}

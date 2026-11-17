@@ -43,6 +43,8 @@ int main(int argc, char **argv)
     if (resolve_target(ctx.options.target, &ctx.target) != 0)
         return 1;
 
+    prepare_reply_display(&ctx.options, &ctx.target);
+
     ctx.socket_fd = create_icmp_socket();
     if (ctx.socket_fd == -1)
         return 1;

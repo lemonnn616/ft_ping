@@ -55,6 +55,27 @@ static uint8_t *build_echo_request(const t_ping_context *ctx,
         i++;
     }
 
+    /*
+     * Preserve the first eight payload bytes as the current
+     * timing-reserved area. Repeat the -p pattern over the
+     * remaining pad, or the entire pad if shorter than 8 bytes.
+     */
+    if (ctx->options.pattern_length > 0)
+    {
+        size_t pad_offset;
+
+        pad_offset = ctx->options.payload_size >= 8 ? 8 : 0;
+        i = sizeof(*header) + pad_offset;
+
+        while (i < *packet_size)
+        {
+            packet[i] = ctx->options.pattern[
+                (i - sizeof(*header) - pad_offset) %
+                ctx->options.pattern_length];
+            i++;
+        }
+    }
+
     header->checksum = icmp_checksum(packet, *packet_size);
 
     return packet;
