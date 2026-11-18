@@ -339,7 +339,19 @@ t_parse_result parse_options(
         }
         else
         {
-            fprintf(stderr, "ft_ping: invalid option\n");
+            if (opt == '?' && optopt != 0)
+                fprintf(stderr, "%s: invalid option -- '%c'\n",
+                        argv[0], optopt);
+            else if (opt == '?' && optind > 0 &&
+                     argv[optind - 1][0] == '-' &&
+                     argv[optind - 1][1] == '-')
+                fprintf(stderr, "%s: unrecognized option '%s'\n",
+                        argv[0], argv[optind - 1]);
+            else
+                fprintf(stderr, "%s: invalid option\n", argv[0]);
+
+            fprintf(stderr, "Try '%s --help' for more information.\n",
+                    argv[0]);
             return PARSE_ERROR;
         }
     }
